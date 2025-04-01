@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradingView API Монитор Сигналов</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Socket.IO клиент -->
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <img src="https://www.tradingview.com/pine-script-docs/en/v5/_images/logo.svg" alt="TradingView Logo" class="logo">
+                <h2>Signal Monitor</h2>
+            </div>
+            <div class="nav-links">
+                <a href="#dashboard" class="active" data-page="dashboard">
+                    <i class="fas fa-tachometer-alt"></i> Панель управления
+                </a>
+                <a href="#signals" data-page="signals">
+                    <i class="fas fa-signal"></i> Сигналы
+                </a>
+                <a href="#positions" data-page="positions">
+                    <i class="fas fa-chart-line"></i> Позиции
+                </a>
+                <a href="#trades-analysis" data-page="trades-analysis">
+                    <i class="fas fa-exchange-alt"></i> Список сделок
+                </a>
+                <a href="#settings" data-page="settings">
+                    <i class="fas fa-cog"></i> Настройки
+                </a>
+            </div>
+            <div class="connection-status">
+                <div class="status-indicator"></div>
+                <span id="connection-text">Подключение...</span>
+            </div>
+        </nav>
+
+        <main class="content">
+            <!-- Dashboard Page -->
+            <section id="dashboard" class="page active">
+                <h1>Панель мониторинга</h1>
+                
+                <div class="stats-cards">
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-bell"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Сигналы сегодня</h3>
+                            <p id="signals-count">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Активные позиции</h3>
+                            <p id="positions-count">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-paper-plane"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Отправлено уведомлений</h3>
+                            <p id="notifications-count">0</p>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-icon">
+                            <i class="fas fa-calendar-check"></i>
+                        </div>
+                        <div class="card-content">
+                            <h3>Время работы</h3>
+                            <p id="uptime">0д 0ч 0м</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <div class="grid-item wide">
+                        <h2>Последние сигналы</h2>
+                        <div class="table-container">
+                            <table id="recent-signals-table">
+                                <thead>
+                                    <tr>
+                                        <th>Время</th>
+                                        <th>Инструмент</th>
+                                        <th>Сигнал</th>
+                                        <th>Цена</th>
+                                        <th>Статус</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-signals-body">
+                                    <!-- Данные будут добавлены через JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-item">
+                        <h2>Активные позиции</h2>
+                        <div class="positions-container" id="active-positions">
+                            <!-- Данные будут добавлены через JavaScript -->
+                            <div class="no-data-message">Нет активных позиций</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-item">
+                        <h2>Статистика сигналов</h2>
+                        <div class="chart-container">
+                            <canvas id="signals-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Signals Page -->
+            <section id="signals" class="page">
+                <h1>История сигналов</h1>
+                
+                <div class="filters">
+                    <div class="filter-group">
+                        <label for="symbol-filter">Инструмент:</label>
+                        <select id="symbol-filter">
+                            <option value="all">Все</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="signal-type-filter">Тип сигнала:</label>
+                        <select id="signal-type-filter">
+                            <option value="all">Все</option>
+                            <option value="BUY">Покупка</option>
+                            <option value="SELL">Продажа</option>
+                            <option value="CLOSE">Закрытие</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="date-filter">Дата:</label>
+                        <input type="date" id="date-filter">
+                    </div>
+                    
+                    <button id="reset-filters">Сбросить фильтры</button>
+                </div>
+                
+                <div class="table-container signals-table">
+                    <table id="signals-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Время</th>
+                                <th>Инструмент</th>
+                                <th>Тип</th>
+                                <th>Цена</th>
+                                <th>Источник</th>
+                                <th>Статус</th>
+                                <th>Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signals-table-body">
+                            <!-- Данные будут добавлены через JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="pagination">
+                    <button id="prev-page" disabled>Предыдущая</button>
+                    <span id="page-info">Страница 1 из 1</span>
+                    <button id="next-page" disabled>Следующая</button>
+                </div>
+            </section>
+
+            <!-- Positions Page -->
+            <section id="positions" class="page">
+                <h1>Управление позициями</h1>
+                
+                <div class="positions-grid">
+                    <div class="grid-item wide">
+                        <h2>Сделки</h2>
+                        <div class="table-container">
+                            <table id="trades-table">
+                                <thead>
+                                    <tr>
+                                        <th>№ Сделки</th>
+                                        <th>Тип</th>
+                                        <th>Сигнал</th>
+                                        <th>Дата/Время</th>
+                                        <th>Цена</th>
+                                        <th>Контракты</th>
+                                        <th>Прибыль</th>
+                                        <th>Совокупная</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trades-table-body">
+                                    <!-- Данные будут добавлены через JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-item wide">
+                        <h2>Текущие позиции</h2>
+                        <div class="table-container">
+                            <table id="current-positions-table">
+                                <thead>
+                                    <tr>
+                                        <th>Инструмент</th>
+                                        <th>Тип</th>
+                                        <th>Открыта</th>
+                                        <th>Цена открытия</th>
+                                        <th>Текущая цена</th>
+                                        <th>P&L</th>
+                                        <th>Время в позиции</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="current-positions-body">
+                                    <!-- Данные будут добавлены через JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-item wide">
+                        <h2>История позиций</h2>
+                        <div class="table-container">
+                            <table id="positions-history-table">
+                                <thead>
+                                    <tr>
+                                        <th>Инструмент</th>
+                                        <th>Тип</th>
+                                        <th>Открыта</th>
+                                        <th>Закрыта</th>
+                                        <th>Цена открытия</th>
+                                        <th>Цена закрытия</th>
+                                        <th>P&L</th>
+                                        <th>Время в позиции</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="positions-history-body">
+                                    <!-- Данные будут добавлены через JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="grid-item wide">
+                        <h2>Форматированная история сделок</h2>
+                        <div class="table-container">
+                            <table id="trades-table">
+                                <thead>
+                                    <tr>
+                                        <th>Действие</th>
+                                        <th>Тип</th>
+                                        <th>Время</th>
+                                        <th>Цена</th>
+                                        <th>P&L</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="trades-body">
+                                    <!-- Данные будут добавлены через JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Trades Analysis Page -->
+            <section id="trades-analysis" class="page">
+                <h1>Анализ сделок</h1>
+                
+                <div class="trades-tabs">
+                    <button class="tab-button active" data-tab="all-trades">Список сделок</button>
+                    <button class="tab-button" data-tab="trades-stats">Коэффициенты риска/эффективности</button>
+                    <button class="tab-button" data-tab="trades-dynamics">Динамика</button>
+                </div>
+                
+                <div class="trades-tab-content active" id="all-trades">
+                    <div class="table-container trades-table-pro">
+                        <table id="trades-analysis-table">
+                            <thead>
+                                <tr>
+                                    <th>№ Сделки <i class="fas fa-sort-down"></i></th>
+                                    <th>Тип</th>
+                                    <th>Сигнал</th>
+                                    <th>Дата/Время</th>
+                                    <th>Цена</th>
+                                    <th>Контракты</th>
+                                    <th>Прибыль</th>
+                                    <th>Совокупная прибыль</th>
+                                    <th>Рост</th>
+                                    <th>Просадка</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trades-analysis-body">
+                                <!-- Данные будут добавлены через JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="trades-tab-content" id="trades-stats">
+                    <h2>Коэффициенты риска и эффективности</h2>
+                    <div class="stats-container">
+                        <div class="stats-item">
+                            <div class="stats-title">Выигрышные сделки</div>
+                            <div class="stats-value" id="winning-trades-count">0</div>
+                            <div class="stats-percent" id="winning-trades-percent">0%</div>
+                        </div>
+                        <div class="stats-item">
+                            <div class="stats-title">Проигрышные сделки</div>
+                            <div class="stats-value" id="losing-trades-count">0</div>
+                            <div class="stats-percent" id="losing-trades-percent">0%</div>
+                        </div>
+                        <div class="stats-item">
+                            <div class="stats-title">Средняя прибыль</div>
+                            <div class="stats-value" id="avg-profit">0 USDT</div>
+                        </div>
+                        <div class="stats-item">
+                            <div class="stats-title">Средний убыток</div>
+                            <div class="stats-value" id="avg-loss">0 USDT</div>
+                        </div>
+                        <div class="stats-item">
+                            <div class="stats-title">Коэффициент прибыль/риск</div>
+                            <div class="stats-value" id="profit-risk-ratio">0</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="trades-tab-content" id="trades-dynamics">
+                    <h2>Динамика торговли</h2>
+                    <div class="chart-container">
+                        <canvas id="trades-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Page -->
+            <section id="settings" class="page">
+                <h1>Настройки</h1>
+                
+                <div class="settings-container">
+                    <div class="settings-group">
+                        <h2>TradingView API</h2>
+                        
+                        <div class="setting-item">
+                            <label for="session-input">Session ID:</label>
+                            <input type="text" id="session-input" placeholder="Введите SESSION ID">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="signature-input">Signature:</label>
+                            <input type="text" id="signature-input" placeholder="Введите SIGNATURE">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="strategy-id-input">ID стратегии:</label>
+                            <input type="text" id="strategy-id-input" placeholder="Например: PUB;xxxxxxxxxxxx">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h2>Telegram</h2>
+                        
+                        <div class="setting-item">
+                            <label for="telegram-token-input">Bot Token:</label>
+                            <input type="text" id="telegram-token-input" placeholder="Введите TELEGRAM_BOT_TOKEN">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="telegram-chat-input">Chat ID:</label>
+                            <input type="text" id="telegram-chat-input" placeholder="Введите TELEGRAM_CHAT_ID">
+                        </div>
+                        
+                        <div class="setting-item checkbox">
+                            <label>
+                                <input type="checkbox" id="send-notifications-checkbox" checked>
+                                Отправлять уведомления в Telegram
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-group">
+                        <h2>Настройки мониторинга</h2>
+                        
+                        <div class="setting-item">
+                            <label for="market-input">Рынок:</label>
+                            <input type="text" id="market-input" placeholder="Например: BINANCE:BTCUSDT">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="timeframe-input">Таймфрейм:</label>
+                            <select id="timeframe-input">
+                                <option value="1">1 минута</option>
+                                <option value="5">5 минут</option>
+                                <option value="15">15 минут</option>
+                                <option value="60">1 час</option>
+                                <option value="240">4 часа</option>
+                                <option value="D">1 день</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="cooldown-input">Период охлаждения (мс):</label>
+                            <input type="number" id="cooldown-input" value="0" min="0" step="1000">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="freshness-input">Свежесть сигнала (мс):</label>
+                            <input type="number" id="freshness-input" value="60000" min="10000" step="10000">
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label for="check-interval-input">Интервал проверки (мс):</label>
+                            <input type="number" id="check-interval-input" value="15000" min="5000" step="1000">
+                        </div>
+                    </div>
+                    
+                    <div class="settings-actions">
+                        <button id="save-settings">Сохранить настройки</button>
+                        <button id="test-connection">Проверить подключение</button>
+                        <button id="restart-monitor">Перезапустить монитор</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="signal-details-modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Детали сигнала</h2>
+            <div id="signal-details-content"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="script.js"></script>
+</body>
+</html> 
